@@ -1,0 +1,21 @@
+# Docker 빌드에 포함하지 않을 항목
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+.git/
+.gitignore
+
+# 사용자별 결과·로그·민감 데이터 (volume mount로 들어옴)
+output/
+screenshots/
+config/google_credentials.json
+config/google_oauth_client.json
+config/oauth_tokens/
+config/blogdex_sessions/
+config/blogdex_session.json
+config/auth.json
+config/settings.json
+config/scheduled_jobs.json

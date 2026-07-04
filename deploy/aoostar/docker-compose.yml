@@ -1,0 +1,135 @@
+# Aoostar WTR Pro N100 — 통합 스택
+# - 마케팅 자동화: Cloudflare Tunnel로 외부 공개 (다중 사용자 로그인 가능)
+# - Immich/Nextcloud: Tailscale VPN으로만 접근 (외부 차단)
+#
+# 사용:
+#   cp .env.example .env  (모든 값 채우기)
+#   docker compose up -d
+#
+# 호스트 사전 준비:
+#   - Ubuntu 24.04 + Docker (setup.sh가 알아서 설치)
+#   - Tailscale 설치 + tailscale up (호스트에 직접)
+#   - UFW 활성화 (외부 포트는 모두 차단; cloudflared만 outbound로 연결)
+#
+# 모든 포트가 127.0.0.1에만 바인딩되어 인터넷에서 직접 접근 불가.
+# Cloudflare Tunnel은 outbound 전용이라 포트포워딩 필요 없음.
+
+services:
+
+  # ============================================================
+  # 1) 마케팅 자동화 (공개)
+  # ============================================================
+
+  marketing:
+    build:
+      context: ../..
+      dockerfile: deploy/Dockerfile
+    image: marketing-app:latest
+    container_name: marketing
+    restart: unless-stopped
+    expose:
+      - "8501"
+    networks:
+      - public_net
+    volumes:
+      - ../../config:/app/config
+      - ../../output:/app/output
+      - ../../screenshots:/app/screenshots
+    environment:
+      TZ: Asia/Seoul
+      # auth.json이 있으면 setup_page()에서 require_auth() 활성화됨
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8501/_stcore/health || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+  # Cloudflare Tunnel — outbound 연결만 사용 (포트포워딩 X)
+  # automation.도메인.com → marketing:8501 으로 라우팅 (대시보드에서 설정)
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - public_net
+    depends_on:
+      - marketing
+
+  # ============================================================
+  # 2) Immich (사진/영상 — 아이폰 자동 백업)  ※ Tailscale-only
+  # ============================================================
+
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    container_name: immich_server
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:2283:2283"        # Tailscale serve로만 노출
+    volumes:
+      - ${IMMICH_UPLOAD_DIR}:/usr/src/app/upload
+      - /etc/localtime:/etc/localtime:ro
+    env_file: .env
+    depends_on:
+      - immich-redis
+      - immich-postgres
+    networks:
+      - private_net
+
+  immich-redis:
+    image: redis:6.2-alpine
+    container_name: immich_redis
+    restart: unless-stopped
+    networks:
+      - private_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+
+  immich-postgres:
+    image: tensorchord/pgvecto-rs:pg14-v0.2.0
+    container_name: immich_postgres
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ${IMMICH_DB_DIR}:/var/lib/postgresql/data
+    networks:
+      - private_net
+
+  # ============================================================
+  # 3) Nextcloud (문서 — 맥북 동기화)  ※ Tailscale-only
+  # ============================================================
+
+  nextcloud:
+    image: nextcloud:latest
+    container_name: nextcloud
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8082:80"          # Tailscale serve로만 노출
+    volumes:
+      - ${NEXTCLOUD_DATA_DIR}:/var/www/html
+    env_file: .env
+    depends_on:
+      - nextcloud-db
+    networks:
+      - private_net
+
+  nextcloud-db:
+    image: mariadb:10.11
+    container_name: nextcloud_db
+    restart: unless-stopped
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    env_file: .env
+    volumes:
+      - ${NEXTCLOUD_DB_DIR}:/var/lib/mysql
+    networks:
+      - private_net
+
+networks:
+  # 마케팅 + cloudflared만 — 외부와 분리
+  public_net:
+    driver: bridge
+  # 개인 파일 서비스 — Tailscale로만 외부 접근
+  private_net:
+    driver: bridge
+    internal: false  # 외부 인터넷 사용은 가능 (앱 업데이트 등). 노출은 127.0.0.1 바인딩으로 막음.

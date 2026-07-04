@@ -1,0 +1,11 @@
+[server]
+# 업로드 파일 최대 크기(MB)
+maxUploadSize = 50
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
+primaryColor = "#4F46E5"

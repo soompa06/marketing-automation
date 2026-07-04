@@ -1,0 +1,54 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# 민감 정보 (절대 커밋하지 말 것)
+.streamlit/secrets.toml
+config/private_key.pem
+~/.soom_marketing_keys/
+deploy/aoostar/.env
+config/settings.json
+config/google_credentials.json
+config/*.token
+config/blogdex_session.json
+config/*_session.json
+config/google_oauth_client.json
+config/oauth_tokens/
+config/scheduled_jobs.json
+config/kakao_templates.json
+config/naver_sessions/
+config/blogdex_sessions/
+config/auth.json
+config/comment_history.json
+config/comment_templates.json
+
+# 작업 결과물 (용량 큼)
+screenshots/
+output/
+
+# Claude Code 로컬 설정/메모리 (공개 저장소에 올리지 않음)
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# 라이선스 (판매용) — 비밀/로컬 전용
+src/licensing/pubkey.pem
+config/license.key
+config/.license_state
+config/.seller
+config/.licensing_off
+deploy/aoostar/.env
+
+# 빌드 산출물
+build/
+dist/
