@@ -27,44 +27,63 @@
 - 중요한 함수에는 docstring 필수
 
 ### 파일/폴더 명명
-- 스크린샷 폴더: `screenshots/{campaign}/{YYYYMMDD}/{블로거이름}/`
-- 캠페인 코드: `restaurant`(가게A) / `skin`(가게B)
-- 결과 CSV: `output/check_results_{YYYYMMDD_HHMMSS}.csv`
+- 스크린샷 폴더:
+  - `--month` 지정 시: `screenshots/{campaign}/{N}월/` (가게별/business 모드)
+  - `--month` 없을 때: `screenshots/{campaign}/{YYYYMMDD}/{폴더명}/`
+- 결과 CSV: `output/{체험명}_노출결과_{YYYYMMDD_HHMMSS}.csv` (예: `계인기_노출결과_20260903_185519.csv`)
+
+### 캠페인 코드 ↔ 실제 가게 매핑
+| 코드 | 가게명 | 업종 | 구글시트 탭 |
+|------|--------|------|-------------|
+| `restaurant` | **계인기** | 만년동/월평동 숯불닭구이·회식 술집 | settings.json `google_sheets.campaigns.restaurant` |
+| `skin` | **에딧** | 서초/강남 성형외과 (리투오 스킨부스터) | settings.json `google_sheets.campaigns.skin` |
+- `--campaign` 값은 자유 입력이며 스크린샷/결과 폴더 라벨로만 쓰인다. 과거 데이터엔 `계인기`/`에딧`/`general`이 섞여 있음.
+- 블덱스 파이프라인(`sheet_pipeline.py --campaign`)은 `restaurant`/`skin` 코드를 그대로 사용.
 
 ## 자주 쓰는 명령어 패턴
+
+> ⚠️ 검수는 `checker.py` **하나로** 단건·일괄 모두 처리한다. `batch_check.py`는 존재하지 않는다.
+> 실제 인자: `--urls`(복수형, `;`구분) · `--folder-names`(`;`구분) · `--keywords`(`,`구분) · `--campaign` · `--month` · `--input` · `--concurrency`. (`--url`/`--blogger-name`은 없음)
 
 ### 단건 검수
 ```bash
 python src/naver_check/checker.py \
-  --url "<URL>" \
+  --urls "<URL>" \
+  --folder-names "<블로거이름>" \
   --keywords "<쉼표 구분 키워드>" \
   --campaign restaurant \
-  --blogger-name "<이름>"
+  --month 9
 ```
+- URL을 빼고 `--folder-names`만 주면 "가게명 검색" 모드 (블로그 글 없이 키워드 순위만 확인)
+- 여러 명: `--urls "u1;u2" --folder-names "이름1;이름2"` (키워드·캠페인은 공통)
 
-### 일괄 검수
+### 일괄 검수 (블로거별 캠페인·키워드 다르게)
 ```bash
-python src/naver_check/batch_check.py --input src/naver_check/batch_input.csv
+python src/naver_check/checker.py --input <csv파일>
 ```
+CSV 형식: `business_name,folder_name,month,url,campaign,keywords`
+(템플릿: `src/naver_check/batch_input.example.csv`)
 
 ## 자주 나오는 사용자 요청 처리법
 
 ### "블로그 URL 검수해줘" 패턴
 사용자가 블로그 URL을 붙여넣고 검수를 요청하면:
 
-1. URL이 식당 캠페인인지 피부과 캠페인인지 물어보기 (대화 맥락에서 추론 가능하면 생략)
-2. 키워드가 명시되지 않으면 `config/settings.json`의 `campaigns.{name}.default_keywords` 사용
-3. 블로거 이름이 없으면 사용자에게 한 번 묻기
-4. `checker.py` 실행
+1. URL이 식당(계인기)인지 피부과(에딧)인지 물어보기 (대화 맥락에서 추론 가능하면 생략)
+2. 키워드가 명시되지 않으면 `config/settings.json`의 `campaigns.{restaurant|skin}.default_keywords` 사용
+3. 블로거 이름(`--folder-names`)이 없으면 사용자에게 한 번 묻기
+4. `checker.py --urls ... --folder-names ... --keywords ... --campaign ...` 실행
 5. 결과 요약을 보여주고, 구글 시트에 붙여넣을 텍스트는 따로 강조
 
-### 기본 키워드 (설정에서 읽기)
-- 식당(restaurant): "둔산동 회식", "대전 가성비 맛집"
-- 피부과(skin): "강남 리투오", "신논현역 성형외과"
+### 기본 키워드 (`config/settings.json`의 `campaigns.{name}.default_keywords`)
+- 식당(restaurant) = **계인기**: "월평동 술집", "월평동 회식", "만년동 닭구이", "대전 한밭수목원 맛집"
+- 피부과(skin) = **에딧**: "강남 리투오", "강남 리투오 후기", "강남 리투오 효과"
+- (위 값은 과거 `output/*_노출결과_*.csv`에서 실제로 순위가 잡힌 키워드 기준. 매달 바뀔 수 있으니 사용자에게 확인)
 
-### "가이드 문구 알려줘" 패턴
-- 식당 가이드: 본 README 또는 `docs/guide_restaurant.md` 참조
-- 피부과 가이드: `docs/guide_skin.md` 참조
+### "가이드 문구 / 모집 문구 알려줘" 패턴
+별도 가이드 md 파일은 없다. 문구는 아래 JSON에 저장돼 있음:
+- 카톡 모집문구: `config/kakao_templates.json` — 계인기(restaurant)·에딧(skin)별 `name`·`body`
+- 네이버 비밀댓글 문구: `config/comment_templates.json` — `default` + `by_keyword`
 
 ## 절대 하지 말아야 할 것
 
