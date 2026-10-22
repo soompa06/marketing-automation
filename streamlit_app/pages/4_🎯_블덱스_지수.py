@@ -190,7 +190,7 @@ if selected_campaigns:
                 f"**🏷️ {cname}**  \n"
                 f"- 시트 ID: `{cinfo.get('spreadsheet_id', '?')[:30]}...`  \n"
                 f"- 메인 시트: `{cinfo.get('main_sheet_name', '?')}`  \n"
-                f"- 미달자 시트: `{cinfo.get('rejected_sheet_name', '미달자')}`  \n"
+                f"- 미달자 시트: `{cinfo.get('rejected_sheet_name', '미달')}`  \n"
                 f"- 블로그주소 컬럼: `{cinfo.get('blog_url_column', 'C')}`  \n"
                 f"- 지수 컬럼: `{cinfo.get('grade_column', 'D')}`"
             )

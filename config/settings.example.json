@@ -5,14 +5,14 @@
       "restaurant": {
         "spreadsheet_id": "여기에_구글시트_ID_입력",
         "main_sheet_name": "시트1",
-        "rejected_sheet_name": "미달자",
+        "rejected_sheet_name": "미달",
         "blog_url_column": "C",
         "grade_column": "D"
       },
       "skin": {
         "spreadsheet_id": "여기에_구글시트_ID_입력",
         "main_sheet_name": "시트1",
-        "rejected_sheet_name": "미달자",
+        "rejected_sheet_name": "미달",
         "blog_url_column": "C",
         "grade_column": "D"
       }

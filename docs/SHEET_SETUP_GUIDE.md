@@ -162,14 +162,14 @@ cp settings.example.json settings.json
       "restaurant": {
         "spreadsheet_id": "여기에_구글시트_ID",
         "main_sheet_name": "4월",
-        "rejected_sheet_name": "미달자",
+        "rejected_sheet_name": "미달",
         "blog_url_column": "C",
         "grade_column": "D"
       },
       "skin": {
         "spreadsheet_id": "여기에_구글시트_ID",
         "main_sheet_name": "5월",
-        "rejected_sheet_name": "미달자",
+        "rejected_sheet_name": "미달",
         "blog_url_column": "C",
         "grade_column": "D"
       }

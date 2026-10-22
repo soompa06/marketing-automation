@@ -176,7 +176,7 @@ with tab_campaigns:
                     )
                     new_rejected_sheet = st.text_input(
                         "미달자 시트 탭 이름",
-                        value=cinfo.get("rejected_sheet_name", "미달자"),
+                        value=cinfo.get("rejected_sheet_name", "미달"),
                         key=f"rej_{cname}",
                     )
                 
@@ -197,7 +197,7 @@ with tab_campaigns:
                 # 변경사항 저장
                 if (new_sheet_id != cinfo.get("spreadsheet_id", "") or
                     new_main_sheet != cinfo.get("main_sheet_name", "") or
-                    new_rejected_sheet != cinfo.get("rejected_sheet_name", "미달자") or
+                    new_rejected_sheet != cinfo.get("rejected_sheet_name", "미달") or
                     new_url_col != cinfo.get("blog_url_column", "C") or
                     new_grade_col != cinfo.get("grade_column", "D")):
                     
@@ -247,7 +247,7 @@ with tab_campaigns:
         with col2:
             new_rejected = st.text_input(
                 "미달자 시트 탭 이름",
-                value="미달자",
+                value="미달",
             )
             new_url_c = st.text_input("블로그주소 컬럼", value="C")
             new_grade_c = st.text_input("지수 컬럼", value="D")

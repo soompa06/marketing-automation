@@ -142,7 +142,7 @@ def get_campaign_config(campaign_name: str) -> CampaignConfig:
         name=campaign_name,
         spreadsheet_id=cfg["spreadsheet_id"],
         main_sheet_name=cfg.get("main_sheet_name", "시트1"),
-        rejected_sheet_name=cfg.get("rejected_sheet_name", "미달자"),
+        rejected_sheet_name=cfg.get("rejected_sheet_name", "미달"),
         blog_url_column=cfg.get("blog_url_column", "C"),
         grade_column=cfg.get("grade_column", "D"),
     )
