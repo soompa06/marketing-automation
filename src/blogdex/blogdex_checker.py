@@ -71,10 +71,20 @@ _GRADE_PARSE_JS = """
         // 직접 URL(/blog/{id})로 이동해도 직전 블로그 내용이 잠깐 남는 스테일을 막는다.
         const bidPresent = bid ? lower.includes(bid) : true;
 
+        // 0-a) 로그인 화면으로 튕김 (페이지 로딩 후 비동기 리다이렉트라 사전 로그인 확인으로는 못 잡음)
+        if (bodyText.includes('구글로 계속하기') || bodyText.includes('카카오로 계속하기')) {
+            return { grade: '', reason: 'session_expired', bodyTextSample: sample };
+        }
+
+        // 0-b) 블덱스 로그인 세션 만료 — 미등록으로 오판하면 시트가 잘못 이동되므로 별도 신호로 분리.
+        if (bodyText.includes('세션 만료')) {
+            return { grade: '', reason: 'session_expired', bodyTextSample: sample };
+        }
+
         // 1) 조회 제한(일시 차단) 신호 — 미등록 안내문('1분에 N회 조회 가능')은 제외.
         //    예: "1분에 2번 이상 요청할 수 없습니다. 잠시 후 다시 시도해주세요(56 초 후 가능)"
         const rateLimitSignals = [
-            '이상 요청할 수 없', '번 이상 요청', '분에 2번', '분에 2회',
+            '이상 요청할 수 없', '번 이상 요청',   // ('분에 2회'는 미등록 화면 하단 안내문이라 제외)
             '조회 횟수', '횟수를 초과', '횟수 초과', '이용량', '요청이 많',
             '잠시 후 다시', '잠시후 다시', '제한되었습니다',
             '초과하셨', 'too many', 'rate limit',
@@ -217,7 +227,7 @@ async def _wait_for_result(page: Page, blog_id: str, timeout_ms: int = 6000) -> 
             info = last
         last = info
         # 등급을 찾았거나, '미등록'/'조회 제한' 신호가 떴으면 즉시 종료
-        if info.get("grade") or info.get("reason") in ("notfound", "rate_limited"):
+        if info.get("grade") or info.get("reason") in ("notfound", "rate_limited", "session_expired"):
             return info
         await page.wait_for_timeout(step)
         elapsed += step
@@ -397,6 +407,7 @@ async def search_blog_index(page: Page, blog_url: str) -> dict:
             () => {
                 const t = document.body.innerText || '';
                 if (t.includes('Google로 로그인') || t.includes('구글로 로그인')
+                    || t.includes('구글로 계속하기') || t.includes('카카오로 계속하기')
                     || t.includes('Sign in with Google')) {
                     return { logged_in: false };
                 }
@@ -438,6 +449,11 @@ async def search_blog_index(page: Page, blog_url: str) -> dict:
                 result["wait_sec"] = int(grade_info2.get("waitSec") or 0)
                 result["error"] = "블덱스 조회 제한 (분당 2회). 대기 후 자동 재시도."
                 return result
+
+        if reason == "session_expired":
+            result["error"] = ("블덱스 로그인이 풀렸습니다(세션 만료). 재로그인: "
+                               "python src/blogdex/session.py")
+            return result
 
         # 그래도 등급이 없으면 '조회 불가' (미등록 등)
         if not result["grade"]:

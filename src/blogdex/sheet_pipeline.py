@@ -51,16 +51,21 @@ from sheet_client import (
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 SETTINGS_PATH = PROJECT_ROOT / "config" / "settings.json"
 
+_sent: list[float] = []   # 최근 블덱스 조회 시작 시각(monotonic) — 분당 제한 선대기용
+
 
 def load_blogdex_settings() -> dict:
     """블덱스 관련 설정 (조회 간격, 제한 대기 등)."""
-    # 전략: 처음부터 느리게 가지 않고 '연속 조회'하다가, 블덱스가 조회 제한을
-    # 띄우면 안내된 시간(N초 후 가능)만큼 자동 대기 후 같은 블로거를 재시도한다.
+    # 전략: 블덱스는 '1분에 2번'까지만 허용 → 슬라이딩 윈도우로 조회 시각을 기록해
+    # 제한에 걸리기 전에 딱 필요한 만큼만 선대기한다 (차단 페이지 왕복·+5초 여유 낭비 제거).
+    # 그래도 제한이 뜨면 안내된 시간(N초 후 가능)만큼 대기 후 같은 블로거를 재시도한다.
     # - query_delay_seconds: 정상 조회 사이의 짧은 간격
     # - rate_limit_wait_seconds: 제한 메시지에 시간이 안 적혀 있을 때 기본 대기
     # - max_rate_limit_retries: 한 블로거가 제한에 걸렸을 때 최대 재시도 횟수
     defaults = {
-        "query_delay_seconds": 2,
+        "query_delay_seconds": 0,
+        "rate_limit_per_minute": 2,       # 블덱스 제한: 1분에 N번 (초과 시 ~1분 차단)
+        "rate_limit_margin_seconds": 2,   # 윈도우 계산 여유 (시계 오차)
         "rate_limit_wait_seconds": 60,
         "max_rate_limit_retries": 5,
         # (구버전 호환 — 더 이상 핵심 로직엔 안 쓰임)
@@ -149,6 +154,10 @@ async def process_campaign(
     print(f"\n🚀 연속 조회 시작 (대상 {len(pending_rows)}명, 조회 간격 {query_delay:.0f}초)")
     print(f"   ⏳ 조회 제한이 뜨면 안내된 시간만큼 자동 대기 후 재시도합니다.\n")
 
+    per_min = max(1, int(bd_settings.get("rate_limit_per_minute", 2)))
+    margin = float(bd_settings.get("rate_limit_margin_seconds", 2))
+    sent = _sent   # 캠페인 간 공유 (restaurant→skin 전환 때도 윈도우 유지)
+
     queue: list[SheetRow] = list(pending_rows)
     rl_retries: dict[int, int] = {}            # row_number → 조회제한 재시도 횟수
     consecutive_unlookup = 0
@@ -158,8 +167,16 @@ async def process_campaign(
 
     while queue and not early_stop:
         row = queue.pop(0)
+        # 선대기: 윈도우(60초) 안에 이미 per_min번 조회했으면 가장 오래된 조회가 빠질 때까지만 대기
+        del sent[:-per_min]
+        if len(sent) == per_min:
+            pre_wait = sent[0] + 60 + margin - time.monotonic()
+            if pre_wait > 0:
+                print(f"  ⏳ 제한 회피 선대기 {pre_wait:.0f}초")
+                await asyncio.sleep(pre_wait)
         print(f"  🔎 [{done+1}/{total}] 행 {row.row_number}: {row.blog_url[:46]}", end="", flush=True)
 
+        sent.append(time.monotonic())
         try:
             result = await search_blog_index(page, row.blog_url)
         except Exception as e:
@@ -183,9 +200,10 @@ async def process_campaign(
                 error_count += 1
                 continue
             wait_s = result.get("wait_sec") or 0
-            wait_s = (wait_s + 5) if wait_s > 0 else default_wait   # 안내초 + 여유
+            wait_s = (wait_s + 2) if wait_s > 0 else default_wait   # 안내초 + 여유
             print(f"  ⏳ 조회 제한 감지 → {wait_s}초 대기 후 재시도 (재시도 {n}/{max_rl_retries})")
             await asyncio.sleep(wait_s)
+            sent.clear()                    # 대기 후엔 윈도우가 비었다고 간주
             queue.insert(0, row)        # 같은 블로거를 맨 앞에 다시
             continue
 
@@ -202,6 +220,16 @@ async def process_campaign(
                 early_stop = True
             continue
 
+        if (result.get("lookup_failed") or grade == LOOKUP_FAILED_LABEL) \
+                and result.get("lookup_reason") != "notfound":
+            # 원인 불명(세션 만료·로딩 실패 등)은 시트를 건드리지 않고 에러로만 센다
+            error_count += 1
+            consecutive_unlookup += 1
+            print(f"  ❓ 원인 불명 조회 실패({result.get('lookup_reason') or '-'}) — 시트 유지")
+            if consecutive_unlookup >= 3:
+                print("🛑 원인 불명 조회 실패 3연속 — 중단 (블덱스 재로그인 후 다시 실행하세요)")
+                early_stop = True
+            continue
         if result.get("lookup_failed") or grade == LOOKUP_FAILED_LABEL:
             rejected_rows.append(row)
             rejected_grades[row.row_number] = LOOKUP_FAILED_LABEL
@@ -230,7 +258,8 @@ async def process_campaign(
                 print(f"  ⚪ {grade} (미달)")
             consecutive_unlookup = 0
 
-        await asyncio.sleep(query_delay)
+        if query_delay > 0:
+            await asyncio.sleep(query_delay)
     
     # 3) 시트 업데이트
     rejected_real = len(rejected_rows) - unlookup_count  # 실제 등급 미달 (조회불가 제외)
