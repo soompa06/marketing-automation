@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import time
 import csv
 import io
 import json
@@ -479,6 +480,29 @@ def classify_qualification(grade: str, qualified_grades: set[str]) -> bool:
 
 
 # =============================================================================
+# 분당 조회 제한 선대기 (sheet_pipeline / check_many 공용)
+# =============================================================================
+
+_sent: list[float] = []   # 최근 블덱스 조회 시작 시각(monotonic) — 프로세스 내 공유
+
+
+async def throttle(per_min: int = 2, margin: float = 2) -> None:
+    """블덱스 '1분에 N번' 제한을 슬라이딩 윈도우로 선대기. 조회 직전에 호출한다.
+
+    최근 60초 안에 이미 per_min번 조회했으면 가장 오래된 조회가 빠질 때까지만 기다리고,
+    이번 조회 시각을 기록한다 (차단 화면 왕복·고정 대기 낭비 제거).
+    """
+    per_min = max(1, per_min)
+    del _sent[:-per_min]
+    if len(_sent) == per_min:
+        wait = _sent[0] + 60 + margin - time.monotonic()
+        if wait > 0:
+            print(f"  ⏳ 제한 회피 선대기 {wait:.0f}초", flush=True)
+            await asyncio.sleep(wait)
+    _sent.append(time.monotonic())
+
+
+# =============================================================================
 # 일괄 조회
 # =============================================================================
 
@@ -493,14 +517,17 @@ async def check_many(
     qualified_grades = load_qualified_grades()
 
     # 전략: 연속 조회하다가 조회 제한이 뜨면 안내된 시간만큼 자동 대기 후 재시도.
-    query_delay = 2
+    query_delay = 0
     default_wait = 60
     max_retries = 5
+    per_min, margin = 2, 2.0
     try:
         if SETTINGS_PATH.exists():
             with open(SETTINGS_PATH, encoding="utf-8") as _f:
                 _bd = json.load(_f).get("blogdex", {})
-                query_delay = float(_bd.get("query_delay_seconds", 2))
+                query_delay = float(_bd.get("query_delay_seconds", 0))
+                per_min = int(_bd.get("rate_limit_per_minute", 2))
+                margin = float(_bd.get("rate_limit_margin_seconds", 2))
                 default_wait = int(_bd.get("rate_limit_wait_seconds", 60))
                 max_retries = int(_bd.get("max_rate_limit_retries", 5))
     except Exception:
@@ -528,6 +555,7 @@ async def check_many(
         while queue:
             url = queue.pop(0)
             blog_id = extract_blog_id(url)
+            await throttle(per_min, margin)
             print(f"  [{done+1}/{total}] {blog_id} 조회 중...", end="", flush=True)
 
             result = await search_blog_index(page, url)
@@ -543,9 +571,10 @@ async def check_many(
                     done += 1
                     continue
                 w = result.get("wait_sec") or 0
-                w = (w + 5) if w > 0 else default_wait
+                w = (w + 2) if w > 0 else default_wait
                 print(f" ⏳ 조회 제한 → {w}초 대기 후 재시도({n}/{max_retries})")
                 await page.wait_for_timeout(w * 1000)
+                _sent.clear()   # 대기 후엔 윈도우가 비었다고 간주
                 queue.insert(0, url)
                 continue
 
@@ -558,7 +587,7 @@ async def check_many(
             results.append(result)
             done += 1
 
-            if queue:
+            if queue and query_delay > 0:
                 await page.wait_for_timeout(int(query_delay * 1000))
 
     finally:

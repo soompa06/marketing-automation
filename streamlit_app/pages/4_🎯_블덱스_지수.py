@@ -234,7 +234,7 @@ with col2:
 
 # 블덱스 설정 미리 보기
 bd_settings = settings.get("blogdex", {})
-query_delay = bd_settings.get("query_delay_seconds", 2)
+query_delay = bd_settings.get("query_delay_seconds", 0)
 qualified_grades = bd_settings.get(
     "qualified_grades",
     ["준최6", "준최7", "최적1", "최적2", "최적3", "최적1+", "최적2+", "최적3+", "최적4+"],
@@ -242,7 +242,7 @@ qualified_grades = bd_settings.get(
 
 with st.expander("📐 블덱스 설정 (수정은 [⚙️ 설정] 메뉴에서)"):
     st.markdown(
-        f"- **조회 방식**: 연속 조회 (조회 간격 {query_delay}초)  \n"
+        f"- **조회 방식**: 연속 조회, 분당 2건 한도에 맞춰 자동 선대기 (추가 간격 {query_delay}초)  \n"
         f"- **조회 제한 시**: 블덱스가 '1분에 2번…' 안내를 띄우면 그 시간만큼 "
         f"자동 대기 후 같은 블로거를 재시도합니다.  \n"
         f"- **자격 등급**: {', '.join(qualified_grades)}"

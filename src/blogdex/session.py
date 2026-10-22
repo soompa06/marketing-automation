@@ -122,7 +122,7 @@ async def is_logged_in(page: Page) -> bool:
             const loginIndicators = [
                 'Google로 로그인', 'Google 로그인', 'Sign in with Google',
                 '구글로 로그인', '구글 로그인',
-                '구글로 계속하기', '카카오로 계속하기',   # 블덱스 3.0 로그인 화면
+                '구글로 계속하기', '카카오로 계속하기',   // 블덱스 3.0 로그인 화면
             ];
             for (const indicator of loginIndicators) {
                 if (text.includes(indicator)) {

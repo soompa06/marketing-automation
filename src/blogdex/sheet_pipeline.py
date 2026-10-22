@@ -37,6 +37,8 @@ from blogdex_checker import (
     classify_qualification,
     load_qualified_grades,
     LOOKUP_FAILED_LABEL,
+    throttle,
+    _sent,
 )
 from sheet_client import (
     CampaignConfig,
@@ -50,8 +52,6 @@ from sheet_client import (
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 SETTINGS_PATH = PROJECT_ROOT / "config" / "settings.json"
-
-_sent: list[float] = []   # 최근 블덱스 조회 시작 시각(monotonic) — 분당 제한 선대기용
 
 
 def load_blogdex_settings() -> dict:
@@ -156,7 +156,6 @@ async def process_campaign(
 
     per_min = max(1, int(bd_settings.get("rate_limit_per_minute", 2)))
     margin = float(bd_settings.get("rate_limit_margin_seconds", 2))
-    sent = _sent   # 캠페인 간 공유 (restaurant→skin 전환 때도 윈도우 유지)
 
     queue: list[SheetRow] = list(pending_rows)
     rl_retries: dict[int, int] = {}            # row_number → 조회제한 재시도 횟수
@@ -167,16 +166,9 @@ async def process_campaign(
 
     while queue and not early_stop:
         row = queue.pop(0)
-        # 선대기: 윈도우(60초) 안에 이미 per_min번 조회했으면 가장 오래된 조회가 빠질 때까지만 대기
-        del sent[:-per_min]
-        if len(sent) == per_min:
-            pre_wait = sent[0] + 60 + margin - time.monotonic()
-            if pre_wait > 0:
-                print(f"  ⏳ 제한 회피 선대기 {pre_wait:.0f}초")
-                await asyncio.sleep(pre_wait)
+        await throttle(per_min, margin)   # 분당 제한 선대기 (캠페인 간 윈도우 공유)
         print(f"  🔎 [{done+1}/{total}] 행 {row.row_number}: {row.blog_url[:46]}", end="", flush=True)
 
-        sent.append(time.monotonic())
         try:
             result = await search_blog_index(page, row.blog_url)
         except Exception as e:
@@ -203,7 +195,7 @@ async def process_campaign(
             wait_s = (wait_s + 2) if wait_s > 0 else default_wait   # 안내초 + 여유
             print(f"  ⏳ 조회 제한 감지 → {wait_s}초 대기 후 재시도 (재시도 {n}/{max_rl_retries})")
             await asyncio.sleep(wait_s)
-            sent.clear()                    # 대기 후엔 윈도우가 비었다고 간주
+            _sent.clear()                   # 대기 후엔 윈도우가 비었다고 간주
             queue.insert(0, row)        # 같은 블로거를 맨 앞에 다시
             continue
 
