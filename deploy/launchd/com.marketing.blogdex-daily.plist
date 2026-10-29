@@ -5,8 +5,11 @@
     <key>Label</key><string>com.marketing.blogdex-daily</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/bin/bash</string>
-        <string>/Users/under0tree/Downloads/marketing_automation/deploy/launchd/run_blogdex_daily.sh</string>
+        <string>/usr/bin/open</string>
+        <string>-g</string>
+        <string>-a</string>
+        <string>Terminal</string>
+        <string>/Users/under0tree/.local/bin/run_blogdex_daily.command</string>
     </array>
     <!-- 10:00 정규 실행, 14:00 보험 (오늘 이미 성공했으면 스크립트가 건너뜀) -->
     <key>StartCalendarInterval</key>
