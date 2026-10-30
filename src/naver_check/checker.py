@@ -1638,6 +1638,24 @@ def _read_csv_with_encoding(csv_path: Path) -> str:
     )
 
 
+def excel_to_csv(excel_path: Path) -> Path:
+    """Excel(.xls/.xlsx) 첫 시트를 숨김 폴더(output/.run_inputs)의 CSV로 변환해 경로 반환.
+
+    Streamlit 검수 페이지의 엑셀 업로드와 같은 방식(첫 줄=헤더, 모든 값 문자열).
+    .xls는 xlrd, .xlsx는 openpyxl 사용.
+    """
+    import pandas as pd
+
+    engine = "openpyxl" if excel_path.suffix.lower() == ".xlsx" else "xlrd"
+    df = pd.read_excel(excel_path, dtype=str, engine=engine).fillna("")
+    df.columns = [str(c).strip() for c in df.columns]
+    out_dir = Path(__file__).resolve().parent.parent.parent / "output" / ".run_inputs"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"input_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    df.to_csv(out, index=False, encoding="utf-8-sig")
+    return out
+
+
 def load_csv_input(csv_path: Path) -> list[dict]:
     """
     CSV에서 블로거 리스트 로드.
@@ -1747,7 +1765,7 @@ def main():
     )
     
     # 입력 방식 2: CSV 파일
-    parser.add_argument("--input", help="CSV 파일 경로 (블로거별로 다른 캠페인·키워드 가능)")
+    parser.add_argument("--input", help="CSV 또는 Excel(.xls/.xlsx) 파일 경로 (블로거별로 다른 캠페인·키워드 가능)")
     
     # 공통 옵션
     parser.add_argument("--headless", action="store_true", help="브라우저 창 숨기기 (병렬 처리 가능)")
@@ -1768,6 +1786,8 @@ def main():
         if not csv_path.exists():
             print(f"❌ CSV 파일을 찾을 수 없습니다: {csv_path}")
             sys.exit(1)
+        if csv_path.suffix.lower() in (".xls", ".xlsx"):
+            csv_path = excel_to_csv(csv_path)
         bloggers = load_csv_input(csv_path)
         print(f"📄 CSV에서 {len(bloggers)}명 로드: {csv_path}")
     
