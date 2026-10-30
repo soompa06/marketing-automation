@@ -43,5 +43,9 @@
       "default_keywords": ["지역 키워드1", "지역 키워드2"],
       "monthly_target": 5
     }
-  }
+  },
+    "lablog": {
+        "user_id": "블연플_아이디",
+        "password": "블연플_비밀번호"
+    }
 }
