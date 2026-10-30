@@ -1,7 +1,7 @@
 #!/bin/bash
-# 블덱스 지수 일일 조회 (launchd에서 10:00 / 14:00 두 번 호출)
+# 블덱스 지수 일일 조회 (launchd에서 10:00 / 15:00 두 번 호출)
 # 설치: cp deploy/launchd/run_blogdex_daily.sh ~/.local/bin/ (~/Downloads 안의 스크립트는 launchd가 못 열어서 밖에 둔다)
-# - 오늘 이미 성공했으면 건너뜀 (14:00은 10:00이 실패/미실행일 때만 실제로 돎)
+# - 오늘 이미 성공했으면 건너뜀 (15:00은 10:00이 실패/미실행일 때만 실제로 돎)
 # - 성공 = 프로세스 정상 종료 + 로그인 실패/중단 흔적 없음 → 마커 파일에 오늘 날짜 기록
 cd /Users/under0tree/Downloads/marketing_automation || exit 1   # ~/.local/bin 사본으로도 실행되므로 절대경로
 STATE_DIR="output/.scheduler"

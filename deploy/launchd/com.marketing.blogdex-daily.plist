@@ -11,11 +11,11 @@
         <string>Terminal</string>
         <string>/Users/under0tree/.local/bin/run_blogdex_daily.command</string>
     </array>
-    <!-- 10:00 정규 실행, 14:00 보험 (오늘 이미 성공했으면 스크립트가 건너뜀) -->
+    <!-- 10:00 정규 실행, 15:00 보험 (오늘 이미 성공했으면 스크립트가 건너뜀) -->
     <key>StartCalendarInterval</key>
     <array>
         <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
-        <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>0</integer></dict>
     </array>
     <key>StandardErrorPath</key><string>/Users/under0tree/Downloads/marketing_automation/output/.scheduler/launchd_err.log</string>
 </dict>
