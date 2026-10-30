@@ -1758,6 +1758,11 @@ def main():
              "생략 시 'general' 사용."
     )
     parser.add_argument(
+        "--business-name",
+        default="",
+        help="가게/체험명 (예: 에딧). 결과 CSV 파일명·그룹에 사용. 생략 시 폴더명에서 추출.",
+    )
+    parser.add_argument(
         "--month",
         default="",
         help="모집·마케팅 월 (예: 5 또는 5월). 결과 CSV의 '월' 컬럼과 "
@@ -1807,6 +1812,7 @@ def main():
                 "folder_name": name,
                 "keywords": keywords,
                 "month": args.month or "",
+                "business_name": args.business_name,
             }
             for url, name in url_name_pairs
         ]
