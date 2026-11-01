@@ -4,7 +4,7 @@
 # - 시각마다 지수 비어있는 행 조회 → 자격(준최5↑) 행에 블연플 점수 덧붙임 ('준최5 / 41')
 # - 성공 = 프로세스 정상 종료 + 로그인 실패/중단 흔적 없음 → 마커 파일에 오늘 날짜 기록
 cd /Users/under0tree/Downloads/marketing_automation || exit 1   # ~/.local/bin 사본으로도 실행되므로 절대경로
-STATE_DIR="output/.scheduler"
+STATE_DIR="$HOME/.local/state/marketing_automation"   # ~/Downloads 밖 (로그를 어디서나 읽을 수 있게)
 MARKER="$STATE_DIR/blogdex_daily_ok"
 LOG="$STATE_DIR/blogdex_daily_$(date +%Y%m%d).log"
 TODAY=$(date +%Y-%m-%d)
