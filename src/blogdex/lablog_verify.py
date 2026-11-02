@@ -41,9 +41,30 @@ def pending_verify_rows(campaign_name: str, qualified: set[str]) -> tuple:
     return cfg, rows
 
 
+async def _goto_ready(page: Page, selector: str, attempts: int = 10) -> None:
+    """진단 URL을 열고 selector가 뜰 때까지 새로고침 재시도.
+
+    블연플은 서버 2대가 서로 다른 배포본(JS 번들 해시가 다름)을 번갈아 응답해,
+    번들이 404면 빈 화면이 된다. 새로 요청하면 다른 서버로 가므로 재시도로 우회한다.
+    """
+    for _ in range(attempts):
+        await page.goto(DIAGNOSE_URL, wait_until="domcontentloaded")
+        try:
+            await page.wait_for_selector(selector, timeout=5000)
+        except Exception:
+            continue
+        # 리뉴얼 안내 팝업이 입력을 가로막으므로 닫는다 (없으면 무시)
+        try:
+            await page.get_by_role("button", name="닫기", exact=True).click(timeout=1500)
+        except Exception:
+            pass
+        return
+    raise RuntimeError(f"블연플 페이지 로딩 실패 ({attempts}회 재시도): {selector}")
+
+
 async def _login(page: Page, user_id: str, password: str) -> None:
     """블연플 로그인 (blogDiagnose 접근 시 로그인 화면으로 이동됨)."""
-    await page.goto(DIAGNOSE_URL, wait_until="domcontentloaded")
+    await _goto_ready(page, "input[name=id]")
     await page.fill("input[name=id]", user_id)
     await page.fill("input[name=pwd]", password)
     await page.click("button[type=submit]")
@@ -55,7 +76,7 @@ async def fetch_score(page: Page, blog_id: str) -> str | None:
 
     직전 결과가 남는 스테일을 막으려고 매번 진단 페이지를 새로 연다.
     """
-    await page.goto(DIAGNOSE_URL, wait_until="domcontentloaded")
+    await _goto_ready(page, "input[type=text]")
     box = page.locator("input[type=text]").first
     await box.fill(blog_id)
     await box.press("Enter")
@@ -93,7 +114,15 @@ async def verify_campaigns(campaign_names: list[str], dry_run: bool = False) -> 
                 updates, ok, fail = [], 0, 0
                 for r in rows:
                     bid = extract_blog_id(r.blog_url)
-                    score = await fetch_score(page, bid)
+                    score = None
+                    for _ in range(2):  # 서버 불안정으로 일시 실패할 수 있어 1회 재시도
+                        try:
+                            score = await fetch_score(page, bid)
+                        except Exception as e:
+                            print(f"  ⚠️ 행 {r.row_number} {bid}: {type(e).__name__} — 재시도")
+                            continue
+                        if score is not None:
+                            break
                     if score is None:
                         fail += 1
                         print(f"  ❌ 행 {r.row_number} {bid}: 점수 없음 (시트 유지)")
