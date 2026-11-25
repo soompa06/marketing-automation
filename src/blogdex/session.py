@@ -305,6 +305,14 @@ async def initial_login(
                         break
                     is_in = False
 
+                # 화면 판정만으론 로그인 전 오판(경과 0초)이 나서, 인증 쿠키(next-auth 세션/유저 토큰)도 필수
+                if is_in:
+                    cookies = await context.cookies()
+                    is_in = any(
+                        "next-auth" in c["name"] and ("user-token" in c["name"] or "session-token" in c["name"])
+                        for c in cookies
+                    )
+
                 if is_in:
                     if not saved_once:
                         print(f"  ✓ 로그인 감지! 즉시 세션 저장 (경과 {elapsed}초)")
